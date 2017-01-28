@@ -8,7 +8,6 @@
 #ifndef SQUARE_H
 #define SQUARE_H
 
-#include <list>
 #include <QLabel>
 
 class Point

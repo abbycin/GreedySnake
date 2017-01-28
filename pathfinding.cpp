@@ -6,8 +6,6 @@
 **********************************************************/
 
 #include "pathfinding.h"
-#include <QDebug>
-#include <thread>
 
 PathFinding::PathFinding(int w, int h)
   : openList(),
@@ -89,7 +87,7 @@ bool PathFinding::isBlock(const Point& point)
 {
   if(point.x < 0 || point.y < 0)
     return true;
-  if(point.x > width || point.y > height)
+  if(point.x >= width || point.y >= height)
     return true;
   for(auto iter = blockList.begin(); iter != blockList.end(); ++iter)
   {

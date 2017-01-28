@@ -10,10 +10,10 @@
 
 #include "square.h"
 #include "pathfinding.h"
+#include "dialog.h"
 #include <QMainWindow>
 #include <QKeyEvent>
 #include <QTimer>
-#include <map>
 #include <random>
 
 namespace Ui {
@@ -29,12 +29,22 @@ public:
   ~MainWindow();
 
 signals:
-      void game_over();
+    void game_over();
 
 private slots:
-      void on_btnRestart_clicked();
+    void on_btnRestart_clicked();
 
-      void on_btnAutoManual_clicked();
+    void on_btnAutoManual_clicked();
+
+    void on_game_over();
+
+    void on_actionQuit_triggered();
+
+    void on_actionAbout_triggered();
+
+    void on_actionSpeed_Up_triggered();
+
+    void on_actionSpeed_Down_triggered();
 
   protected:
    void keyPressEvent(QKeyEvent* e);
@@ -46,12 +56,16 @@ private:
   std::list<Square*> world;
   std::list<Square*> snake;
   std::random_device rd;
-  std::mt19937 gen;
+  //std::mt19937 gen;
   bool is_manual;
   PathFinding aStar;
   QTimer* timer;
+  Dialog* dialog;
+  int timeout;
 
   void init();
+
+  bool isBlock(const Point& pos);
 
   void setUpFoodorHead(Square::Id);
 
@@ -61,17 +75,21 @@ private:
 
   Square* findPoint(const Point& p);
 
-  void moveAround(const Point &target);
+  bool moveAround(const Point &target);
 
-  void moveUp();
+  bool moveUp();
 
-  void moveDown();
+  bool moveDown();
 
-  void moveLeft();
+  bool moveLeft();
 
-  void moveRight();
+  bool moveRight();
+
+  bool randomMove();
 
   void autoMove();
+
+  void updateTimeout();
 };
 
 #endif // MAINWINDOW_H

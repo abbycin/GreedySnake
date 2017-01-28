@@ -7,20 +7,19 @@
 
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
-#include <cstdlib>
-#include <ctime>
+#include <QMessageBox>
 #include <QDebug>
-#include <thread>
-#include <chrono>
+#include <memory>
 
 MainWindow::MainWindow(QWidget *parent) :
   QMainWindow(parent),
   ui(new Ui::MainWindow),
-  kSize(20), // 20 row 20 column
-  gen{rd()},
+  kSize(20),
   is_manual(true),
   aStar(kSize, kSize),
-  timer(new QTimer(this))
+  timer(new QTimer(this)),
+  dialog(new Dialog(this)),
+  timeout(200)
 {
   ui->setupUi(this);
   this->init();
@@ -31,6 +30,7 @@ MainWindow::~MainWindow()
   delete ui;
   timer->stop();
   delete timer;
+  delete dialog;
   for(auto& x: world)
   {
     if(x)
@@ -74,6 +74,8 @@ void MainWindow::init()
 {
   // initialize Window
   this->setFixedSize(this->width(), this->height());
+  this->setWindowTitle(QString("life: +1s"));
+  this->updateTimeout();
   // initialize GridView
   ui->playground->setSpacing(0);
   ui->playground->setMargin(1);
@@ -91,8 +93,23 @@ void MainWindow::init()
   this->setUpFoodorHead(Square::Id::Food);
   this->setUpFoodorHead(Square::Id::Head);
   // setup signals and slots
-  timer->setInterval(500);
+  timer->setInterval(timeout);
   connect(timer, &QTimer::timeout, this, &MainWindow::autoMove);
+  connect(this, &MainWindow::game_over, this, &MainWindow::on_game_over);
+}
+
+bool MainWindow::isBlock(const Point &pos)
+{
+  if(pos.x < 0 || pos.y < 0)
+    return true;
+  if(pos.x >= kSize || pos.y >= kSize)
+    return true;
+  for(auto iter = snake.begin(); iter != snake.end(); ++iter)
+  {
+    if((*iter)->get_point().equal(pos))
+      return true;
+  }
+  return false;
 }
 
 void MainWindow::setUpFoodorHead(Square::Id id)
@@ -102,7 +119,7 @@ void MainWindow::setUpFoodorHead(Square::Id id)
   for(auto iter = world.begin(); iter != world.end(); ++iter)
   {
     auto inner = iter;
-    while(step--)
+    while(step-- > 0 && inner != world.end())
       ++inner;
     for(; !tried && inner != world.end(); ++iter)
     {
@@ -139,20 +156,24 @@ void MainWindow::setUpFoodorHead(Square::Id id)
 
 int MainWindow::genRand(int n)
 {
+  std::mt19937 gen{rd()};
   std::uniform_int_distribution<> dis(0, n - 1);
   return dis(gen);
 }
 
 void MainWindow::on_btnRestart_clicked()
 {
-    for(auto iter = world.begin(); iter != world.end(); ++iter)
-    {
-      (*iter)->set_id(Square::Id::None).update_style();
-      (*iter)->label()->clear();
-    }
-    snake.clear();
-    this->setUpFoodorHead(Square::Id::Food);
-    this->setUpFoodorHead(Square::Id::Head);
+  timer->stop();
+  is_manual = true;
+  timeout = 200;
+  for(auto iter = world.begin(); iter != world.end(); ++iter)
+  {
+    (*iter)->set_id(Square::Id::None).update_style();
+    (*iter)->label()->clear();
+  }
+  snake.clear();
+  this->setUpFoodorHead(Square::Id::Food);
+  this->setUpFoodorHead(Square::Id::Head);
 }
 
 bool MainWindow::isReachFood(Square *head)
@@ -180,20 +201,19 @@ Square* MainWindow::findPoint(const Point &p)
  *  x
  */
 
-void MainWindow::moveAround(const Point& target)
+bool MainWindow::moveAround(const Point& target)
 {
+  if(isBlock(target))
+    return false;
+
   Square* target_square = this->findPoint(target);
   if(target_square == nullptr)
   {
     emit game_over();
-    return;
+    return false;
   }
   target_square->set_id(Square::Id::Head).update_style();
-  for(auto& x: snake)
-  {
-    x->set_id(Square::Id::Snake).update_style();
-  }
-  //qDebug() << "(" << target.x << ", " << target.y << ")";
+  snake.front()->set_id(Square::Id::Snake).update_style();
   snake.push_front(target_square);
   if(isReachFood(target_square))
   {
@@ -204,51 +224,72 @@ void MainWindow::moveAround(const Point& target)
     snake.back()->set_id(Square::Id::None).update_style();
     snake.pop_back();
   }
+  this->setWindowTitle(QString("life: +%1s").arg(snake.size()));
+  return true;
 }
 
-void MainWindow::moveUp()
+bool MainWindow::moveUp()
 {
   Point cur_pos = snake.front()->get_point();
   Point target{cur_pos.x - 1, cur_pos.y};
-  moveAround(target);
+  return moveAround(target);
 }
 
-void MainWindow::moveDown()
+bool MainWindow::moveDown()
 {
   Point cur_pos = snake.front()->get_point();
   Point target{cur_pos.x + 1, cur_pos.y};
-  moveAround(target);
+  return moveAround(target);
 }
 
-void MainWindow::moveLeft()
+bool MainWindow::moveLeft()
 {
   Point cur_pos = snake.front()->get_point();
   Point target{cur_pos.x, cur_pos.y - 1};
-  moveAround(target);
+  return moveAround(target);
 }
 
-void MainWindow::moveRight()
+bool MainWindow::moveRight()
 {
   Point cur_pos = snake.front()->get_point();
   Point target{cur_pos.x, cur_pos.y + 1};
-  moveAround(target);
+  return moveAround(target);
+}
+
+bool MainWindow::randomMove()
+{
+  if(moveUp())
+    return true;
+  if(moveDown())
+    return true;
+  if(moveLeft())
+    return true;
+  return moveRight();
 }
 
 void MainWindow::autoMove()
 {
-  timer->stop();
   auto& path = aStar.reset(snake).find(snake.front(), food);
+  // only go first step
+  if(path.size() < 1)
+  {
+    if(!this->randomMove())
+      emit game_over();
+    return;
+  }
   /*
   for(auto iter = path.rbegin(); iter != path.rend(); ++iter)
   {
     moveAround(*iter);
   }
   */
-  // only go first step
-  auto iter = path.rbegin();
-  ++iter;
+  auto iter = ++path.rbegin();
   moveAround(*iter);
-  timer->start();
+}
+
+void MainWindow::updateTimeout()
+{
+  ui->timeout->setText(QString("Move Interval: %1").arg(timeout));
 }
 
 void MainWindow::on_btnAutoManual_clicked()
@@ -264,4 +305,39 @@ void MainWindow::on_btnAutoManual_clicked()
     timer->stop();
   }
   is_manual = !is_manual;
+}
+
+void MainWindow::on_game_over()
+{
+  QMessageBox::information(this, "Game Over", "<span style=\"text-align: center;"
+                           "color: red; font-size: 36px\">Game Over</span>");
+  qApp->quit();
+}
+
+void MainWindow::on_actionQuit_triggered()
+{
+    qApp->quit();
+}
+
+void MainWindow::on_actionAbout_triggered()
+{
+    dialog->show();
+}
+
+void MainWindow::on_actionSpeed_Up_triggered()
+{
+  timeout -= 10;
+  if(timeout < 11)
+    timeout = 10;
+  this->updateTimeout();
+  timer->setInterval(timeout);
+}
+
+void MainWindow::on_actionSpeed_Down_triggered()
+{
+    timeout += 10;
+    if(timeout > 499)
+      timeout = 500;
+    this->updateTimeout();
+    timer->setInterval(timeout);
 }

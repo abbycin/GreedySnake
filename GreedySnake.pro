@@ -27,10 +27,15 @@ QMAKE_CXXFLAGS += -Wall
 SOURCES += main.cpp\
         mainwindow.cpp \
     square.cpp \
-    pathfinding.cpp
+    pathfinding.cpp \
+    dialog.cpp
 
 HEADERS  += mainwindow.h \
     square.h \
-    pathfinding.h
+    pathfinding.h \
+    dialog.h
 
-FORMS    += mainwindow.ui
+FORMS    += mainwindow.ui \
+    dialog.ui
+
+RESOURCES +=
