@@ -43,13 +43,6 @@ bool Point::equal(const Point& rhs) const
   return (x == rhs.x && y == rhs.y);
 }
 
-bool Point::range_equal(const Point &rhs, int offset_x, int offset_y) const
-{
-  if(std::abs(x - rhs.x) < offset_x || std::abs(y - rhs.y) < offset_y)
-    return true;
-  return false;
-}
-
 float Point::get_f() const
 {
   return g + h;
@@ -70,8 +63,7 @@ Square::Square(int x_, int y_)
     pos_(x_, y_),
     id_(Id::None)
 {
-  label_->resize(20, 20);
-  label_->setFixedSize(24, 18);
+  label_->setFixedSize(27, 22);
   label_->setAlignment(Qt::AlignCenter);
   this->update_style();
 }
@@ -155,21 +147,6 @@ Square& Square::set_id(Id id)
 Square::Id Square::get_id() const
 {
   return id_;
-}
-
-bool Square::is_snake() const
-{
-  return id_ == Id::Snake;
-}
-
-bool Square::is_food() const
-{
-  return id_ == Id::Food;
-}
-
-bool Square::is_blank() const
-{
-  return id_ == Id::None;
 }
 
 QLabel* Square::label()

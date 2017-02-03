@@ -9,28 +9,26 @@
 #define PATHFINDING_H
 
 #include "square.h"
+#include <functional>
 
 using PointPtrList = std::list<Point*>;
 using PointList = std::list<Point>;
+using Callback = std::function<Point*()>;
 
 class PathFinding
 {
   public:
-    enum struct Id : int {
-      G = 0,
-      H,
-      F
-    };
-
     PathFinding(int w, int h);
 
     ~PathFinding();
 
     void clear();
 
-    PathFinding& reset(std::list<Square *> &snake);
+    PathFinding& reset(std::list<Square *> &snake, bool including_tail = true);
 
-    const PointList &find(Square* start, Square* end);
+    PointList findBest(Square* start, Square* end);
+
+    PointList findWorst(Square* start, Square* end);
 
   private:
     PointPtrList openList;
@@ -46,7 +44,9 @@ class PathFinding
 
     Point* minF(PointPtrList& l);
 
-//    bool removeFromList(PointList& l, Point* point);
+    Point* maxF(PointPtrList& l);
+
+    const PointList& find(Point* start, Point* target, Callback cb);
 
     void setUpNewPoint(const Point& newp, Point* oldp, Point* target);
 

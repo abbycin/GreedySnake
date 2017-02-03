@@ -31,8 +31,6 @@ class Point
 
   bool equal(const Point& rhs) const;
 
-  bool range_equal(const Point& rhs, int offset_x, int offset_y) const;
-
   float get_f() const;
 
   float manHattanDistance(const Point& target) const;
@@ -79,12 +77,6 @@ class Square
     Square& set_id(Id id);
 
     Id get_id() const;
-
-    bool is_snake() const;
-
-    bool is_food() const;
-
-    bool is_blank() const;
 
     QLabel* label();
 

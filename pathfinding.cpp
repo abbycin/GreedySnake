@@ -29,47 +29,37 @@ void PathFinding::clear()
   path.clear();
 }
 
-PathFinding& PathFinding::reset(std::list<Square *>& snake)
+PathFinding& PathFinding::reset(std::list<Square *>& snake, bool including_tail)
 {
   this->clear();
   for(auto iter = snake.begin(); iter != snake.end(); ++iter)
   {
     blockList.push_back((*iter)->get_point());
   }
+  if(!including_tail)
+    blockList.pop_back();
   return *this;
 }
 
-const PointList& PathFinding::find(Square *start, Square *end)
+PointList PathFinding::findBest(Square *start, Square *end)
 {
   auto target = new Point{end->get_point()};
   auto beg = new Point{start->get_point()};
-  beg->h = beg->manHattanDistance(*target);
-  closeList.push_back(beg);
-  addToOpenList(beg, target);
-  Point* next = nullptr;
-  bool found = true;
-  for(;;)
-  {
-    next = minF(openList);
-    if(next == nullptr)
-    {
-      found = false;
-      break;
-    }
-    if(next->equal(*target)) // found in closeList
-      break;
-    addToOpenList(next, target);
-  }
+  this->find(beg, target, [this] {
+    return minF(openList);
+  });
   delete target;
-  if(!found)
-    return path;
+  return path;
+}
 
-  next = closeList.back();
-  while(next != nullptr)
-  {
-    path.push_back(*next);
-    next = next->prev;
-  }
+PointList PathFinding::findWorst(Square *start, Square *end)
+{
+  auto beg = new Point{start->get_point()};
+  auto target = new Point{end->get_point()};
+  this->find(beg, target, [this] {
+    return maxF(openList);
+  });
+  delete target;
   return path;
 }
 
@@ -113,10 +103,57 @@ Point* PathFinding::minF(PointPtrList &l)
   }
   if(res != nullptr)
   {
-    openList.erase(found);
+    l.erase(found);
     closeList.push_back(res);
   }
   return res;
+}
+
+Point* PathFinding::maxF(PointPtrList &l)
+{
+  if(l.size() == 0)
+    return nullptr;
+  l.sort([](const Point* lhs, const Point* rhs) {
+    return lhs->get_f() > rhs->get_f(); // descending order
+  });
+  auto iter = l.begin();
+  closeList.push_back(*iter);
+  l.erase(iter);
+  return *iter;
+}
+
+const PointList& PathFinding::find(Point *start, Point *target, Callback cb)
+{
+  start->h = start->manHattanDistance(*target);
+  closeList.push_back(start);
+  addToOpenList(start, target);
+  Point* next = nullptr;
+  bool found = true;
+  for(;;)
+  {
+    next = cb();
+    if(next == nullptr)
+    {
+      found = false;
+      break;
+    }
+    if(next->equal(*target)) // found in closeList
+      break;
+    addToOpenList(next, target);
+  }
+
+  if(!found)
+    return path;
+
+  next = closeList.back();
+  while(next != nullptr)
+  {
+    path.push_back(*next);
+    next = next->prev;
+  }
+  path.pop_back(); // pop head
+  std::reverse(path.begin(), path.end());
+  return path;
 }
 
 void PathFinding::setUpNewPoint(const Point& newp, Point *oldp, Point *target)

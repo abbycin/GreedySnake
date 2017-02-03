@@ -9,7 +9,7 @@
 #include "ui_mainwindow.h"
 #include <QMessageBox>
 #include <QDebug>
-#include <memory>
+#include <algorithm>
 
 MainWindow::MainWindow(QWidget *parent) :
   QMainWindow(parent),
@@ -157,7 +157,7 @@ void MainWindow::setUpFoodorHead(Square::Id id)
 int MainWindow::genRand(int n)
 {
   std::mt19937 gen{rd()};
-  std::uniform_int_distribution<> dis(0, n - 1);
+  std::uniform_int_distribution<> dis(0, n);
   return dis(gen);
 }
 
@@ -166,6 +166,8 @@ void MainWindow::on_btnRestart_clicked()
   timer->stop();
   is_manual = true;
   timeout = 200;
+  this->updateTimeout();
+  this->setWindowTitle(QString("life: +1s"));
   for(auto iter = world.begin(); iter != world.end(); ++iter)
   {
     (*iter)->set_id(Square::Id::None).update_style();
@@ -209,7 +211,7 @@ bool MainWindow::moveAround(const Point& target)
   Square* target_square = this->findPoint(target);
   if(target_square == nullptr)
   {
-    emit game_over();
+    emit game_over("no target found in this world");
     return false;
   }
   target_square->set_id(Square::Id::Head).update_style();
@@ -256,39 +258,134 @@ bool MainWindow::moveRight()
   return moveAround(target);
 }
 
-bool MainWindow::randomMove()
+bool MainWindow::randomMove(Square* vfood)
 {
-  if(moveUp())
-    return true;
-  if(moveDown())
-    return true;
-  if(moveLeft())
-    return true;
-  return moveRight();
+  std::vector<Point> pos;
+  Point head = snake.front()->get_point();
+  pos.emplace_back(head.x - 1, head.y);
+  pos.emplace_back(head.x + 1, head.y);
+  pos.emplace_back(head.x, head.y - 1);
+  pos.emplace_back(head.x, head.y + 1);
+  std::sort(pos.begin(), pos.end(),
+            [target = vfood->get_point()] (const Point& lhs, const Point& rhs) {
+    return lhs.manHattanDistance(target) < rhs.manHattanDistance(target);
+  });
+  int step = genRand(pos.size() - 1);
+  auto inner = pos.begin() + step;
+  bool ok = true;
+  for(auto outer = pos.begin(); outer != pos.end(); ++outer)
+  {
+    for(;ok && inner != pos.end(); ++inner)
+    {
+      if(moveAround(*inner))
+        return true;
+      ok = false;
+    }
+    if(moveAround(*outer))
+      return true;
+  }
+  return false;
+}
+
+bool MainWindow::vMove()
+{
+  std::list<Point> path;
+  while(true)
+  {
+    path = aStar.reset(vsnake).findBest(vsnake.front(), food);
+    if(path.size() == 0)
+      return false;
+    vsnake.push_front(this->findPoint(path.front()));
+    if(!isReachFood(vsnake.front()))
+      vsnake.pop_back();
+    else
+      break;
+  }
+  return true;
 }
 
 void MainWindow::autoMove()
 {
-  auto& path = aStar.reset(snake).find(snake.front(), food);
-  // only go first step
-  if(path.size() < 1)
+  if(real_path.size() != 0)
   {
-    if(!this->randomMove())
-      emit game_over();
+    // shall never fire.
+    if(!moveAround(real_path.front()))
+    {
+      emit game_over("<span style=\"text-align: center;"
+                     "color: red; font-size: 18px\">"
+                     "Target in snake, Game Over</span>");
+    }
+    real_path.pop_front();
     return;
   }
-  /*
-  for(auto iter = path.rbegin(); iter != path.rend(); ++iter)
+
+  if(snake.size() < 5)
   {
-    moveAround(*iter);
+    real_path = aStar.reset(snake).findBest(snake.front(), food);
+    return;
   }
-  */
-  auto iter = ++path.rbegin();
-  moveAround(*iter);
+
+  vsnake = snake;
+  bool res = this->vMove();
+
+  if(res)
+  {
+    // after simulating can we reach the tail?
+    auto path = aStar.reset(vsnake, false).findBest(vsnake.front(), vsnake.back());
+    if(path.size() == 0)
+    {
+      // find worst way to the tail for our real snake.
+      real_path = aStar.reset(snake, false).findWorst(snake.front(), snake.back());
+      if(real_path.size() == 0)
+      {
+        if(!randomMove(snake.back()))
+        {
+          emit game_over("<span style=\"text-align: center;"
+                         "color: red; font-size: 18px\">"
+                         "No available path, Game Over</span>");
+        }
+      }
+      else
+      {
+        real_path.pop_back(); // pop snake tail
+      }
+    }
+    else
+    {
+      real_path = aStar.reset(snake).findBest(snake.front(), food);
+    }
+    return;
+  }
+  else
+  {
+    auto path = aStar.reset(vsnake, false).findWorst(vsnake.front(), vsnake.back());
+    if(path.size() < 2)
+    {
+      if(randomMove(food))
+        return;
+    }
+    else
+    {
+      real_path = aStar.reset(snake, false).findWorst(snake.front(), snake.back());
+      if(real_path.size() < 2)
+      {
+        if(randomMove(snake.back()))
+          return;
+      }
+      else
+      {
+        real_path.pop_back(); // pop snake tail
+        return;
+      }
+    }
+  }
+  emit game_over("<span style=\"text-align: center;"
+                 "color: red; font-size: 36px\">Game Over</span>");
 }
 
 void MainWindow::updateTimeout()
 {
+  timer->setInterval(timeout);
   ui->timeout->setText(QString("Move Interval: %1").arg(timeout));
 }
 
@@ -307,11 +404,11 @@ void MainWindow::on_btnAutoManual_clicked()
   is_manual = !is_manual;
 }
 
-void MainWindow::on_game_over()
+void MainWindow::on_game_over(QString msg)
 {
-  QMessageBox::information(this, "Game Over", "<span style=\"text-align: center;"
-                           "color: red; font-size: 36px\">Game Over</span>");
-  qApp->quit();
+  QMessageBox::information(this, "Game Over", msg);
+  timer->stop();
+  //qApp->quit();
 }
 
 void MainWindow::on_actionQuit_triggered()
@@ -330,7 +427,6 @@ void MainWindow::on_actionSpeed_Up_triggered()
   if(timeout < 11)
     timeout = 10;
   this->updateTimeout();
-  timer->setInterval(timeout);
 }
 
 void MainWindow::on_actionSpeed_Down_triggered()
@@ -339,5 +435,4 @@ void MainWindow::on_actionSpeed_Down_triggered()
     if(timeout > 499)
       timeout = 500;
     this->updateTimeout();
-    timer->setInterval(timeout);
 }

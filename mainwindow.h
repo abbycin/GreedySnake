@@ -29,14 +29,14 @@ public:
   ~MainWindow();
 
 signals:
-    void game_over();
+    void game_over(QString msg);
 
 private slots:
     void on_btnRestart_clicked();
 
     void on_btnAutoManual_clicked();
 
-    void on_game_over();
+    void on_game_over(QString msg);
 
     void on_actionQuit_triggered();
 
@@ -55,6 +55,8 @@ private:
   Square* food;
   std::list<Square*> world;
   std::list<Square*> snake;
+  std::list<Square*> vsnake;
+  std::list<Point> real_path;
   std::random_device rd;
   //std::mt19937 gen;
   bool is_manual;
@@ -85,7 +87,9 @@ private:
 
   bool moveRight();
 
-  bool randomMove();
+  bool randomMove(Square *vfood);
+
+  bool vMove();
 
   void autoMove();
 
