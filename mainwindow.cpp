@@ -51,22 +51,28 @@ void MainWindow::keyPressEvent(QKeyEvent *e)
     e->accept();
     return;
   }
+  bool ok = true;
   switch(e->key())
   {
     case Qt::Key_W:
-      moveUp();
+      ok = moveUp();
       break;
     case Qt::Key_S:
-      moveDown();
+      ok = moveDown();
       break;
     case Qt::Key_A:
-      moveLeft();
+      ok = moveLeft();
       break;
     case Qt::Key_D:
-      moveRight();
+      ok = moveRight();
       break;
     default:
       break;
+  }
+  if(!ok)
+  {
+    emit game_over("<span style=\"text-align: center;"
+                   "color: red; font-size: 36px\">Game Over</span>");
   }
 }
 
@@ -304,6 +310,7 @@ bool MainWindow::vMove()
   return true;
 }
 
+// also simulate random move ?
 void MainWindow::autoMove()
 {
   if(real_path.size() != 0)
@@ -391,6 +398,7 @@ void MainWindow::updateTimeout()
 
 void MainWindow::on_btnAutoManual_clicked()
 {
+  real_path.clear();
   if(is_manual)
   {
     ui->btnAutoManual->setText("Manual");
@@ -407,8 +415,7 @@ void MainWindow::on_btnAutoManual_clicked()
 void MainWindow::on_game_over(QString msg)
 {
   QMessageBox::information(this, "Game Over", msg);
-  timer->stop();
-  //qApp->quit();
+  qApp->quit();
 }
 
 void MainWindow::on_actionQuit_triggered()
