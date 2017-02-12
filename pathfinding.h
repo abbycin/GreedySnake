@@ -48,9 +48,9 @@ class PathFinding
 
     const PointList& find(Point* start, Point* target, Callback cb);
 
-    void setUpNewPoint(const Point& newp, Point* oldp, Point* target);
+    void setUpNewPoint(const Point& newp, Point* oldp, Point* target, float cost);
 
-    bool addToOpenList(Point* point, Point *target);
+    void addToOpenList(Point* point, Point *target);
 
     void safe_clear(PointPtrList& l);
 };

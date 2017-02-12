@@ -120,14 +120,14 @@ bool MainWindow::isBlock(const Point &pos)
 
 void MainWindow::setUpFoodorHead(Square::Id id)
 {
-  int step = genRand(world.size() - 1);
+  int step = genRand(world.size() - 1) - 1;
   bool tried = false;
   for(auto iter = world.begin(); iter != world.end(); ++iter)
   {
     auto inner = iter;
-    while(step-- > 0 && inner != world.end())
+    while(step-- > 0)
       ++inner;
-    for(; !tried && inner != world.end(); ++iter)
+    for(; !tried && inner != world.end(); ++inner)
     {
       if((*inner)->get_id() == Square::Id::None)
       {
@@ -142,8 +142,8 @@ void MainWindow::setUpFoodorHead(Square::Id id)
         (*inner)->set_id(id).update_style();
         return;
       }
-      tried = true;
     }
+    tried = true;
     if((*iter)->get_id() == Square::Id::None)
     {
       if(id == Square::Id::Food)

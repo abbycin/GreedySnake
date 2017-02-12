@@ -6,6 +6,7 @@
 **********************************************************/
 
 #include "pathfinding.h"
+#include <QDebug>
 
 PathFinding::PathFinding(int w, int h)
   : openList(),
@@ -89,37 +90,28 @@ bool PathFinding::isBlock(const Point& point)
 
 Point* PathFinding::minF(PointPtrList &l)
 {
-  float minimum = 9999999999.0f;
-  Point* res = nullptr;
-  PointPtrList::iterator found;
-  for(auto iter = l.begin(); iter != l.end(); ++iter)
-  {
-    if((*iter)->get_f() < minimum)
-    {
-      minimum = (*iter)->get_f();
-      res = *iter;
-      found = iter;
-    }
-  }
-  if(res != nullptr)
-  {
-    l.erase(found);
-    closeList.push_back(res);
-  }
-  return res;
+  if(l.empty())
+    return nullptr;
+  l.sort([](const Point* lhs, const Point* rhs) {
+    return lhs->get_f() < rhs->get_f();
+  });
+  auto iter = l.front();
+  closeList.push_back(iter);
+  l.pop_front();
+  return iter;
 }
 
 Point* PathFinding::maxF(PointPtrList &l)
 {
-  if(l.size() == 0)
+  if(l.empty())
     return nullptr;
   l.sort([](const Point* lhs, const Point* rhs) {
     return lhs->get_f() > rhs->get_f(); // descending order
   });
-  auto iter = l.begin();
-  closeList.push_back(*iter);
-  l.erase(iter);
-  return *iter;
+  auto iter = l.front();
+  closeList.push_back(iter);
+  l.pop_front();
+  return iter;
 }
 
 const PointList& PathFinding::find(Point *start, Point *target, Callback cb)
@@ -128,21 +120,18 @@ const PointList& PathFinding::find(Point *start, Point *target, Callback cb)
   closeList.push_back(start);
   addToOpenList(start, target);
   Point* next = nullptr;
-  bool found = true;
   for(;;)
   {
     next = cb();
     if(next == nullptr)
     {
-      found = false;
       break;
     }
     if(next->equal(*target)) // found in closeList
       break;
     addToOpenList(next, target);
   }
-
-  if(!found)
+  if(next == nullptr)
     return path;
 
   next = closeList.back();
@@ -156,14 +145,14 @@ const PointList& PathFinding::find(Point *start, Point *target, Callback cb)
   return path;
 }
 
-void PathFinding::setUpNewPoint(const Point& newp, Point *oldp, Point *target)
+void PathFinding::setUpNewPoint(const Point& newp, Point *oldp, Point *target, float cost)
 {
   if(isInList(closeList, newp) || isBlock(newp))
   {
     return;
   }
   float h = newp.manHattanDistance(*target);
-  float f = oldp->g + 1 + h;
+  float f = oldp->g + cost + h;
   bool is_in_list = false;
   // if it's already in openList and it has shorter path (small f)
   // then update its f
@@ -174,7 +163,7 @@ void PathFinding::setUpNewPoint(const Point& newp, Point *oldp, Point *target)
       is_in_list = true;
       if(f < oldp->get_f())
       {
-        (*iter)->g = oldp->g + 1;
+        (*iter)->g = oldp->g + cost;
         (*iter)->h = h;
         (*iter)->prev = oldp;
         return;
@@ -186,28 +175,27 @@ void PathFinding::setUpNewPoint(const Point& newp, Point *oldp, Point *target)
   if(!is_in_list)
   {
     Point* node = new Point{newp.x, newp.y};
-    node->g = oldp->g + 1;
+    node->g = oldp->g + cost;
     node->h = h;
     node->prev = oldp;
     openList.push_back(node);
   }
 }
 
-bool PathFinding::addToOpenList(Point *point, Point* target)
+void PathFinding::addToOpenList(Point *point, Point* target)
 {
   // Up
   Point up{point->x - 1, point->y};
-  setUpNewPoint(up, point, target);
+  setUpNewPoint(up, point, target, 1);
   // Down
   Point down{point->x + 1, point->y};
-  setUpNewPoint(down, point, target);
+  setUpNewPoint(down, point, target, 1);
   // Left
   Point left{point->x, point->y - 1};
-  setUpNewPoint(left, point, target);
+  setUpNewPoint(left, point, target, 1);
   // Right
   Point right{point->x, point->y + 1};
-  setUpNewPoint(right, point, target);
-  return true;
+  setUpNewPoint(right, point, target, 1);
 }
 
 void PathFinding::safe_clear(PointPtrList &l)
