@@ -24,12 +24,13 @@ Point::Point(int x_, int y_)
 Point::Point(const Point &rhs)
   : Point()
 {
-  x = rhs.x;
-  y = rhs.y;
+  *this = rhs;
 }
 
 const Point& Point::operator= (const Point& rhs)
 {
+  if(this == &rhs)
+    return *this;
   x = rhs.x;
   y = rhs.y;
   g = 0.0;
